@@ -81,6 +81,16 @@ def release(bump_type: Optional[str]):
         info_message("Committing changelog changes...")
         git_manager.commit_changes("Changelog", files=["CHANGELOG.md"])
 
+        # Push release branch to remote if remote exists
+        if git_manager.has_remote():
+            info_message("Pushing release branch to remote...")
+            try:
+                git_manager.push_branch(release_branch_name, set_upstream=True)
+                info_message(f"✓ Pushed {release_branch_name} to remote")
+            except GitOperationError as e:
+                warning_message(f"Failed to push release branch: {e}")
+                warning_message("You may need to push manually")
+
         success_message(
             f"✓ Release branch '{release_branch_name}' created successfully!"
         )
