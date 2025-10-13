@@ -1,3 +1,5 @@
+⚠️ Mostly AI generated
+
 # GRM - Git Release Manager
 
 A Python-based CLI tool for managing Git releases with strict, predefined commit messages and automated changelog updates.
