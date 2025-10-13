@@ -85,12 +85,15 @@ grm r --patch
 
 **What it does:**
 
-1. Detects integration branch (main or master)
-2. Reads existing SemVer tags to determine current version
-3. Suggests next version based on bump type
-4. Creates `release/<version>` branch
-5. Moves unreleased content from CHANGELOG.md to new version section
-6. Commits changelog with message "Changelog"
+1. Checks if you're on the correct branch (develop if it exists, otherwise main/master)
+   - If you're on a different branch with no uncommitted changes, offers to switch to develop automatically
+   - After switching, pulls the latest changes from the remote (if available)
+2. Detects integration branch (main or master)
+3. Reads existing SemVer tags to determine current version
+4. Suggests next version based on bump type
+5. Creates `release/<version>` branch
+6. Moves unreleased content from CHANGELOG.md to new version section
+7. Commits changelog with message "Changelog"
 
 ### 2. Finish Release (`grm f`)
 
@@ -147,10 +150,12 @@ All notable changes to this project will be documented in this file.
 1. **Start a release:**
 
 ```bash
-$ grm r -m
-Detected integration branch: main
+$ grm r
 Last version: 1.1.1
-Next version (minor): 1.2.0
+Choose bump type:
+  [m]inor → 1.2.0
+  [p]atch → 1.1.2
+Enter m or p [M/p]: 
 Create release 1.2.0? [Y/n]: y
 ✓ Created release branch 'release/1.2.0'
 ✓ Updated CHANGELOG.md
@@ -192,7 +197,8 @@ GRM performs comprehensive validation:
 Common error scenarios:
 
 - Uncommitted changes → Commit or stash first
-- Wrong branch → Switch to correct branch
+- Wrong branch (with changes) → Switch to correct branch manually
+- Wrong branch (without changes) → Offers to switch automatically
 - Missing changelog → Will prompt to create
 - No unreleased content → Will warn but can continue
 

@@ -273,6 +273,23 @@ class GitManager:
         except Exception as e:
             raise GitOperationError(f"Failed to push branch '{branch_name}': {e}")
 
+    def pull_branch(self, branch_name: Optional[str] = None) -> None:
+        """Pull latest changes from remote for a branch.
+
+        Args:
+            branch_name: Name of the branch to pull. If None, pulls current branch
+
+        Raises:
+            GitOperationError: If pull fails
+        """
+        try:
+            if branch_name is None:
+                branch_name = self.get_current_branch_name()
+
+            self.repo.git.pull("origin", branch_name)
+        except Exception as e:
+            raise GitOperationError(f"Failed to pull branch '{branch_name}': {e}")
+
     def has_remote(self) -> bool:
         """Check if repository has a remote configured.
 

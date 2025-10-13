@@ -170,18 +170,117 @@ class TestCLI:
     def test_release_command_wrong_branch_with_develop(
         self, mock_changelog_manager, mock_git_manager
     ):
-        """Test release command on wrong branch when develop exists."""
+        """Test release command on wrong branch when develop exists - prompt to switch."""
         git_mock = Mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "develop"
         git_mock.get_current_branch_name.return_value = "feature-branch"
+        git_mock.branch_exists.return_value = True
         mock_git_manager.return_value = git_mock
 
         runner = CliRunner()
-        result = runner.invoke(release, ["--minor"])
+        # Decline the prompt to switch branches
+        result = runner.invoke(release, ["--minor"], input="n\n")
 
         assert result.exit_code == 1
-        assert "Must be on 'develop' branch" in result.output
+        assert "Currently on 'feature-branch' branch" in result.output
+        assert "Switch to 'develop' branch and continue?" in result.output
+        assert "Release creation cancelled." in result.output
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    def test_release_command_wrong_branch_with_develop_accept_switch(
+        self, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command on wrong branch when develop exists - accept switch."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "develop"
+        git_mock.get_current_branch_name.return_value = "feature-branch"
+        git_mock.branch_exists.return_value = True
+        git_mock.get_all_tags.return_value = ["0.1.0"]
+        git_mock.has_remote.return_value = True
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        runner = CliRunner()
+        # Accept the prompt to switch branches, then confirm the release creation
+        result = runner.invoke(release, ["--minor"], input="y\ny\n")
+
+        assert result.exit_code == 0
+        git_mock.checkout_branch.assert_called_with("develop")
+        git_mock.pull_branch.assert_called_once_with("develop")
+        assert "Switched to 'develop' branch" in result.output
+        assert "Pulled latest changes" in result.output
+        assert "Release branch 'release/0.2.0' created successfully!" in result.output
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    def test_release_command_wrong_branch_accept_switch_no_remote(
+        self, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command on wrong branch - accept switch without remote."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "develop"
+        git_mock.get_current_branch_name.return_value = "feature-branch"
+        git_mock.branch_exists.return_value = True
+        git_mock.get_all_tags.return_value = ["0.1.0"]
+        git_mock.has_remote.return_value = False
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        runner = CliRunner()
+        result = runner.invoke(release, ["--minor"], input="y\ny\n")
+
+        assert result.exit_code == 0
+        git_mock.checkout_branch.assert_called_with("develop")
+        git_mock.pull_branch.assert_not_called()
+        assert "Switched to 'develop' branch" in result.output
+        assert "Release branch 'release/0.2.0' created successfully!" in result.output
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    def test_release_command_wrong_branch_accept_switch_pull_fails(
+        self, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command on wrong branch - accept switch but pull fails."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "develop"
+        git_mock.get_current_branch_name.return_value = "feature-branch"
+        git_mock.branch_exists.return_value = True
+        git_mock.get_all_tags.return_value = ["0.1.0"]
+        git_mock.has_remote.return_value = True
+        git_mock.pull_branch.side_effect = GitOperationError("Network error")
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        runner = CliRunner()
+        result = runner.invoke(release, ["--minor"], input="y\ny\n")
+
+        assert result.exit_code == 0
+        git_mock.checkout_branch.assert_called_with("develop")
+        git_mock.pull_branch.assert_called_once_with("develop")
+        assert "Switched to 'develop' branch" in result.output
+        assert "Failed to pull latest changes" in result.output
+        assert "Continuing with local version" in result.output
+        assert "Release branch 'release/0.2.0' created successfully!" in result.output
 
     @patch("grm.cli.GitManager")
     @patch("grm.cli.ChangelogManager")
@@ -679,6 +778,18 @@ class TestCLI:
         version_manager = VersionManager(["1.0.0"])
 
         with patch("click.prompt", return_value="m"):
+            result = _prompt_for_bump_type(version_manager)
+            assert result == "minor"
+
+    def test_prompt_for_bump_type_default(self):
+        """Test prompting for bump type - default (Enter) selects minor."""
+        from grm.cli import _prompt_for_bump_type
+        from grm.version_manager import VersionManager
+
+        version_manager = VersionManager(["1.0.0"])
+
+        # Empty string simulates pressing Enter with default value
+        with patch("click.prompt", return_value=""):
             result = _prompt_for_bump_type(version_manager)
             assert result == "minor"
 

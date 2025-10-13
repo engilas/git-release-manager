@@ -234,10 +234,33 @@ def _validate_release_preconditions(
     current_branch = git_manager.get_current_branch_name()
 
     if current_branch != release_source_branch:
-        error_exit(
-            f"Must be on '{release_source_branch}' branch to create a release. "
-            f"Currently on '{current_branch}'."
-        )
+        # Check if develop branch exists and we're not on it
+        if release_source_branch == "develop" and git_manager.branch_exists("develop"):
+            # Offer to checkout to develop and continue
+            warning_message(
+                f"Currently on '{current_branch}' branch, but releases must be created from '{release_source_branch}'."
+            )
+            if confirm_action(f"Switch to '{release_source_branch}' branch and continue?", default=True):
+                info_message(f"Checking out '{release_source_branch}' branch...")
+                git_manager.checkout_branch(release_source_branch)
+                success_message(f"✓ Switched to '{release_source_branch}' branch")
+                
+                # Pull latest changes if remote exists
+                if git_manager.has_remote():
+                    info_message(f"Pulling latest changes from remote...")
+                    try:
+                        git_manager.pull_branch(release_source_branch)
+                        success_message(f"✓ Pulled latest changes")
+                    except GitOperationError as e:
+                        warning_message(f"Failed to pull latest changes: {e}")
+                        warning_message("Continuing with local version")
+            else:
+                error_exit("Release creation cancelled.")
+        else:
+            error_exit(
+                f"Must be on '{release_source_branch}' branch to create a release. "
+                f"Currently on '{current_branch}'."
+            )
 
     # Create changelog if it doesn't exist
     if not changelog_manager.changelog_exists():
@@ -295,8 +318,8 @@ def _prompt_for_bump_type(version_manager: VersionManager) -> str:
     click.echo(f"  [p]atch → {next_patch}")
 
     while True:
-        choice = click.prompt("Enter m or p", type=str).lower().strip()
-        if choice in ["m", "minor"]:
+        choice = click.prompt("[M/p]", type=str, default="m", show_default=False).lower().strip()
+        if choice in ["m", "minor", ""]:
             return "minor"
         elif choice in ["p", "patch"]:
             return "patch"
