@@ -25,7 +25,7 @@ class GitManager:
             GitOperationError: If the path is not a valid Git repository
         """
         try:
-            self.repo = Repo(repo_path)
+            self.repo = Repo(repo_path, search_parent_directories=True)
         except InvalidGitRepositoryError:
             raise GitOperationError(f"'{repo_path}' is not a valid Git repository")
 
