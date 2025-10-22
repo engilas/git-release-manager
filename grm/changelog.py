@@ -285,14 +285,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         if not has_unreleased:
             issues.append("Missing '## Unreleased' section")
 
-        # Check version header format
-        for i, line in enumerate(lines, 1):
-            if line.strip().startswith("## ") and not self.UNRELEASED_PATTERN.match(
-                line.strip()
-            ):
-                if not self.VERSION_HEADER_PATTERN.match(line.strip()):
-                    issues.append(
-                        f"Line {i}: Invalid version header format: '{line.strip()}'"
-                    )
-
         return issues

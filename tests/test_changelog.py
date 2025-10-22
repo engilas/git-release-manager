@@ -298,25 +298,3 @@ class TestChangelogManager:
         issues = changelog_manager.validate_changelog_format()
         assert any("Missing '## Unreleased' section" in issue for issue in issues)
 
-    def test_validate_changelog_format_invalid_version_header(
-        self, changelog_manager: ChangelogManager
-    ):
-        """Test validating with invalid version header format."""
-        content = """# Changelog
-
-## Unreleased
-
-## Invalid Version Header
-
-### Added
-- Some feature
-
-## 1.0.0 - 2023-12-01
-
-### Added
-- Initial release
-"""
-        changelog_manager.write_changelog(content)
-
-        issues = changelog_manager.validate_changelog_format()
-        assert any("Invalid version header format" in issue for issue in issues)
