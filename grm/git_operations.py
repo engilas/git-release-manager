@@ -1,6 +1,7 @@
 """Git operations wrapper for GRM."""
 
 import os
+import sys
 from typing import List, Optional, Tuple
 import git
 from git import Repo, InvalidGitRepositoryError
@@ -15,19 +16,49 @@ class GitOperationError(Exception):
 class GitManager:
     """Manages Git operations for release management."""
 
-    def __init__(self, repo_path: str = "."):
+    def __init__(self, repo_path: str = ".", auto_cd: bool = None):
         """Initialize GitManager with repository path.
 
         Args:
             repo_path: Path to the Git repository
+            auto_cd: Automatically change to repo root without prompting.
+                    If None, prompts when stdin is a TTY, otherwise auto-changes.
 
         Raises:
             GitOperationError: If the path is not a valid Git repository
         """
         try:
             self.repo = Repo(repo_path, search_parent_directories=True)
+            # Change working directory to repo root for consistent file operations
+            repo_root = self.get_repo_root()
+            current_dir = os.getcwd()
+            if current_dir != repo_root:
+                # Determine if we should prompt
+                should_prompt = auto_cd is False or (auto_cd is None and sys.stdin.isatty())
+                
+                if should_prompt:
+                    # Inform user and get confirmation
+                    print(f"Current directory: {current_dir}")
+                    print(f"Repository root:   {repo_root}")
+                    response = input("Change to repository root? [Y/n]: ").strip().lower()
+                    if response in ['', 'y', 'yes']:
+                        os.chdir(repo_root)
+                        print(f"Changed directory to: {repo_root}")
+                    else:
+                        print("Continuing in current directory (may cause issues with file paths)")
+                else:
+                    # Auto-change without prompting
+                    os.chdir(repo_root)
         except InvalidGitRepositoryError:
             raise GitOperationError(f"'{repo_path}' is not a valid Git repository")
+
+    def get_repo_root(self) -> str:
+        """Get the absolute path to the repository root.
+
+        Returns:
+            Absolute path to the repository root directory
+        """
+        return self.repo.working_tree_dir
 
     def is_working_directory_clean(self) -> bool:
         """Check if working directory has no uncommitted changes.

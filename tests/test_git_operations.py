@@ -270,3 +270,144 @@ class TestGitManager:
         with patch("grm.git_operations.GitManager.has_remote", return_value=True):
             manager = GitManager(git_manager.repo.working_dir)
             assert manager.has_remote() is True
+
+    def test_get_repo_root(self, git_manager: GitManager):
+        """Test getting repository root path."""
+        repo_root = git_manager.get_repo_root()
+        assert repo_root == git_manager.repo.working_dir
+        assert os.path.isabs(repo_root)
+
+    def test_init_from_subdirectory(self, git_repo):
+        """Test GitManager initialization from a subdirectory."""
+        # Create a subdirectory
+        subdir = os.path.join(git_repo.working_dir, "subdir", "nested")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Should find the repo from parent directories
+            manager = GitManager(".")
+            # Use realpath to resolve symlinks (e.g., /var -> /private/var on macOS)
+            assert os.path.realpath(manager.repo.working_dir) == os.path.realpath(git_repo.working_dir)
+            # Should have changed to repo root
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_true(self, git_repo):
+        """Test auto_cd=True changes directory without prompting."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # auto_cd=True should change directory without prompting
+            manager = GitManager(".", auto_cd=True)
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_false_accept(self, git_repo):
+        """Test auto_cd=False prompts and accepts change."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Mock user input to accept
+            with patch("builtins.input", return_value="y"):
+                manager = GitManager(".", auto_cd=False)
+                assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_false_reject(self, git_repo):
+        """Test auto_cd=False prompts and rejects change."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Mock user input to reject
+            with patch("builtins.input", return_value="n"):
+                manager = GitManager(".", auto_cd=False)
+                # Should stay in subdirectory
+                assert os.path.realpath(os.getcwd()) == os.path.realpath(subdir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_false_default_yes(self, git_repo):
+        """Test auto_cd=False with empty input (default yes)."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Mock user input to just press enter (defaults to yes)
+            with patch("builtins.input", return_value=""):
+                manager = GitManager(".", auto_cd=False)
+                assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_none_non_tty(self, git_repo):
+        """Test auto_cd=None in non-TTY mode auto-changes without prompting."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Mock sys.stdin.isatty() to return False (non-interactive)
+            with patch("sys.stdin.isatty", return_value=False):
+                manager = GitManager(".", auto_cd=None)
+                # Should auto-change in non-TTY mode
+                assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_auto_cd_none_tty_mode(self, git_repo):
+        """Test auto_cd=None in TTY mode prompts user."""
+        subdir = os.path.join(git_repo.working_dir, "subdir")
+        os.makedirs(subdir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            # Mock sys.stdin.isatty() to return True and user accepts
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("builtins.input", return_value="y"):
+                    manager = GitManager(".", auto_cd=None)
+                    assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_no_cd_when_already_at_root(self, git_repo):
+        """Test that no directory change happens when already at root."""
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(git_repo.working_dir)
+            # Should not prompt or change when already at root
+            manager = GitManager(".", auto_cd=False)
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
+
+    def test_search_parent_directories_deep_nesting(self, git_repo):
+        """Test finding repo from deeply nested subdirectory."""
+        deep_dir = os.path.join(git_repo.working_dir, "a", "b", "c", "d", "e")
+        os.makedirs(deep_dir)
+        
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(deep_dir)
+            manager = GitManager(".")
+            assert os.path.realpath(manager.repo.working_dir) == os.path.realpath(git_repo.working_dir)
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(git_repo.working_dir)
+        finally:
+            os.chdir(original_cwd)
