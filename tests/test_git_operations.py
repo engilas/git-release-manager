@@ -23,6 +23,55 @@ class TestGitManager:
         with pytest.raises(GitOperationError, match="not a valid Git repository"):
             GitManager(non_git_dir)
 
+    def test_init_with_subdirectory(self, git_manager: GitManager):
+        """Test GitManager initialization from a subdirectory of a Git repository."""
+        # Create a subdirectory in the repository
+        sub_dir = os.path.join(git_manager.repo.working_dir, "subdir", "nested")
+        os.makedirs(sub_dir)
+
+        # Initialize GitManager from the subdirectory
+        manager_from_subdir = GitManager(sub_dir)
+
+        # Should find the parent repository
+        assert manager_from_subdir.repo is not None
+        assert manager_from_subdir.repo.working_dir == git_manager.repo.working_dir
+
+    def test_init_with_deep_subdirectory(self, git_manager: GitManager):
+        """Test GitManager initialization from a deeply nested subdirectory."""
+        # Create a deeply nested subdirectory structure
+        deep_dir = os.path.join(
+            git_manager.repo.working_dir, "level1", "level2", "level3", "level4"
+        )
+        os.makedirs(deep_dir)
+
+        # Initialize GitManager from the deep subdirectory
+        manager_from_deep = GitManager(deep_dir)
+
+        # Should still find the root repository
+        assert manager_from_deep.repo is not None
+        assert manager_from_deep.repo.working_dir == git_manager.repo.working_dir
+
+    def test_init_subdirectory_operations(self, git_manager: GitManager):
+        """Test that operations work correctly when initialized from a subdirectory."""
+        # Create a subdirectory
+        sub_dir = os.path.join(git_manager.repo.working_dir, "src")
+        os.makedirs(sub_dir)
+
+        # Initialize GitManager from subdirectory
+        manager_from_subdir = GitManager(sub_dir)
+
+        # Test various operations
+        assert manager_from_subdir.get_current_branch_name() == "main"
+        assert manager_from_subdir.is_working_directory_clean() is True
+
+        # Create a file in the subdirectory
+        test_file = os.path.join(sub_dir, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+
+        # Working directory should now be dirty
+        assert manager_from_subdir.is_working_directory_clean() is False
+
     def test_is_working_directory_clean_when_clean(self, git_manager: GitManager):
         """Test working directory status when clean."""
         assert git_manager.is_working_directory_clean() is True
