@@ -93,6 +93,36 @@ class TestCLI:
 
     @patch("grm.cli.GitManager")
     @patch("grm.cli.ChangelogManager")
+    @patch("grm.cli.VersionManager")
+    def test_release_command_major_flag(
+        self, mock_version_manager, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command with major flag."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "main"
+        git_mock.get_current_branch_name.return_value = "main"
+        git_mock.get_all_tags.return_value = ["1.0.0"]
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        version_mock = Mock()
+        version_mock.suggest_version.return_value = Mock(__str__=lambda x: "2.0.0")
+        mock_version_manager.return_value = version_mock
+
+        runner = CliRunner()
+        result = runner.invoke(release, ["--major"], input="y\n")
+
+        assert result.exit_code == 0
+        version_mock.suggest_version.assert_called_with("major")
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
     def test_release_command_dirty_working_directory(
         self, mock_changelog_manager, mock_git_manager
     ):
@@ -814,3 +844,14 @@ class TestCLI:
         with patch("click.prompt", side_effect=["invalid", "x", "m"]):
             result = _prompt_for_bump_type(version_manager)
             assert result == "minor"
+
+    def test_prompt_for_bump_type_major(self):
+        """Test prompting for bump type - major selected."""
+        from grm.cli import _prompt_for_bump_type
+        from grm.version_manager import VersionManager
+
+        version_manager = VersionManager(["1.0.0"])
+
+        with patch("click.prompt", return_value="M"):
+            result = _prompt_for_bump_type(version_manager)
+            assert result == "major"

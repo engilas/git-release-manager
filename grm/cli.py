@@ -42,6 +42,13 @@ def cli(ctx):
     flag_value="patch",
     help="Create a patch version bump (X.Y.Z+1)",
 )
+@click.option(
+    "-M",
+    "--major",
+    "bump_type",
+    flag_value="major",
+    help="Create a major version bump (X+1.0.0)",
+)
 def release(bump_type: Optional[str]):
     """Create a new release branch."""
 
@@ -313,18 +320,22 @@ def _prompt_for_bump_type(version_manager: VersionManager) -> str:
 
     next_minor = version_manager.get_next_minor_version()
     next_patch = version_manager.get_next_patch_version()
+    next_major = version_manager.get_next_major_version()
 
     click.echo(f"  [m]inor → {next_minor}")
     click.echo(f"  [p]atch → {next_patch}")
+    click.echo(f"  [M]ajor → {next_major}")
 
     while True:
-        choice = click.prompt("[M/p]", type=str, default="m", show_default=False).lower().strip()
-        if choice in ["m", "minor", ""]:
-            return "minor"
-        elif choice in ["p", "patch"]:
+        choice = click.prompt("(minor default)", type=str, default="m", show_default=False).strip()
+        if choice in ["M"] or choice.lower() == "major":
+            return "major"
+        elif choice.lower() in ["p", "patch"]:
             return "patch"
+        elif choice.lower() in ["m", "minor", ""]:
+            return "minor"
         else:
-            click.echo("Please enter 'm' for minor or 'p' for patch.")
+            click.echo("Please enter 'm' for minor, 'p' for patch, or 'M' for major.")
 
 
 def main():

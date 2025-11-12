@@ -83,6 +83,10 @@ grm r --minor
 # Patch version bump (1.2.3 → 1.2.4)
 grm r -p
 grm r --patch
+
+# Major version bump (1.2.3 → 2.0.0)
+grm r -M
+grm r --major
 ```
 
 **What it does:**
@@ -157,7 +161,8 @@ Last version: 1.1.1
 Choose bump type:
   [m]inor → 1.2.0
   [p]atch → 1.1.2
-Enter m or p [M/p]: 
+  [M]ajor → 2.0.0
+(minor default): 
 Create release 1.2.0? [Y/n]: y
 ✓ Created release branch 'release/1.2.0'
 ✓ Updated CHANGELOG.md
