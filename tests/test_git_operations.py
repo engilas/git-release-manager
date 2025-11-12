@@ -319,3 +319,32 @@ class TestGitManager:
         with patch("grm.git_operations.GitManager.has_remote", return_value=True):
             manager = GitManager(git_manager.repo.working_dir)
             assert manager.has_remote() is True
+
+    def test_get_integration_branch_no_remote(self, git_manager: GitManager):
+        """Test integration branch when no remote and no local main/master."""
+        # Rename main to something else
+        git_manager.repo.heads.main.rename("develop")
+        
+        # Ensure no remote
+        assert git_manager.has_remote() is False
+        
+        # Should raise error since no remote to fall back to
+        with pytest.raises(
+            GitOperationError, match="Neither 'main' nor 'master' branch found"
+        ):
+            git_manager.get_integration_branch()
+
+    def test_get_release_source_branch_no_remote_develop(self, git_manager: GitManager):
+        """Test release source branch when no origin/develop, falls back to integration."""
+        # Mock remote without develop
+        with patch.object(git_manager, 'has_remote', return_value=True):
+            with patch.object(git_manager.repo, 'remote') as mock_remote:
+                # Create mock references without develop
+                mock_ref = Mock()
+                mock_ref.name = "origin/main"
+                mock_remote.return_value.refs = [mock_ref]
+                
+                result = git_manager.get_release_source_branch()
+                
+                # Should fall back to integration branch (main)
+                assert result == "main"

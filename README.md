@@ -188,7 +188,9 @@ Release 1.2.0 finished successfully!
 GRM works with the following branch strategy:
 
 - **Integration Branch**: `main` (preferred) or `master`
+  - If the branch doesn't exist locally but exists as `origin/main` or `origin/master`, GRM will automatically create a local tracking branch
 - **Development Branch**: `develop` (optional)
+  - If the branch doesn't exist locally but exists as `origin/develop`, GRM will automatically create a local tracking branch
 - **Release Branches**: `release/<version>`
 
 ## Error Handling

@@ -44,7 +44,7 @@ class GitManager:
             'main' if it exists, otherwise 'master'
 
         Raises:
-            GitOperationError: If neither main nor master branch exists
+            GitOperationError: If neither main nor master branch exists locally or remotely
         """
         branches = [branch.name for branch in self.repo.branches]
 
@@ -52,8 +52,24 @@ class GitManager:
             return "main"
         elif "master" in branches:
             return "master"
-        else:
-            raise GitOperationError("Neither 'main' nor 'master' branch found")
+        
+        # Check remote branches if local branches don't exist
+        if self.has_remote():
+            try:
+                remote_refs = [ref.name for ref in self.repo.remote().refs]
+                
+                if "origin/main" in remote_refs:
+                    # Create local tracking branch for origin/main
+                    self.repo.git.checkout("-b", "main", "--track", "origin/main")
+                    return "main"
+                elif "origin/master" in remote_refs:
+                    # Create local tracking branch for origin/master
+                    self.repo.git.checkout("-b", "master", "--track", "origin/master")
+                    return "master"
+            except Exception as e:
+                raise GitOperationError(f"Failed to create local branch from remote: {e}")
+        
+        raise GitOperationError("Neither 'main' nor 'master' branch found locally or remotely")
 
     def get_release_source_branch(self) -> str:
         """Detect the branch from which releases should be created.
@@ -62,14 +78,27 @@ class GitManager:
             'develop' if it exists, otherwise the integration branch (main or master)
 
         Raises:
-            GitOperationError: If neither main nor master branch exists
+            GitOperationError: If neither main nor master branch exists locally or remotely
         """
         branches = [branch.name for branch in self.repo.branches]
 
         if "develop" in branches:
             return "develop"
-        else:
-            return self.get_integration_branch()
+        
+        # Check remote branches for develop
+        if self.has_remote():
+            try:
+                remote_refs = [ref.name for ref in self.repo.remote().refs]
+                
+                if "origin/develop" in remote_refs:
+                    # Create local tracking branch for origin/develop
+                    self.repo.git.checkout("-b", "develop", "--track", "origin/develop")
+                    return "develop"
+            except Exception:
+                # If we can't create develop from remote, fall back to integration branch
+                pass
+        
+        return self.get_integration_branch()
 
     def get_all_tags(self) -> List[str]:
         """Get all tags from the repository.
