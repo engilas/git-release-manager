@@ -142,6 +142,18 @@ def finish():
         # Merge to integration branch (main/master)
         info_message(f"Merging to {integration_branch}...")
         git_manager.checkout_branch(integration_branch)
+        
+        # Pull latest changes from remote before merging
+        if git_manager.has_remote():
+            info_message(f"Pulling latest changes from {integration_branch}...")
+            try:
+                git_manager.pull_branch(integration_branch)
+                success_message(f"✓ Pulled latest changes from {integration_branch}")
+            except GitOperationError as e:
+                warning_message(f"Failed to pull latest changes: {e}")
+                if not confirm_action("Continue with merge anyway?", default=False):
+                    error_exit("Release finish cancelled.")
+        
         git_manager.merge_branch(current_branch, commit_message, no_ff=True)
 
         # Create tag
@@ -152,6 +164,18 @@ def finish():
         if git_manager.branch_exists("develop"):
             info_message("Merging back to develop...")
             git_manager.checkout_branch("develop")
+            
+            # Pull latest changes from remote before merging
+            if git_manager.has_remote():
+                info_message(f"Pulling latest changes from develop...")
+                try:
+                    git_manager.pull_branch("develop")
+                    success_message(f"✓ Pulled latest changes from develop")
+                except GitOperationError as e:
+                    warning_message(f"Failed to pull latest changes from develop: {e}")
+                    if not confirm_action("Continue with merge anyway?", default=False):
+                        error_exit("Release finish cancelled.")
+            
             git_manager.merge_branch(integration_branch, commit_message, no_ff=True)
         else:
             warning_message("No 'develop' branch found, skipping merge back")

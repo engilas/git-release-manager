@@ -111,11 +111,13 @@ grm f
 
 **What it does:**
 
-1. Merges release branch to integration branch (main/master)
-2. Creates tag with version number
-3. Merges back to develop branch (if it exists)
-4. Deletes release branch (local and remote)
-5. All merge commits use message "Finish `<version>`"
+1. Pulls latest changes from integration branch (main/master) before merging
+2. Merges release branch to integration branch (main/master)
+3. Creates tag with version number
+4. Pulls latest changes from develop (if it exists) before merging back
+5. Merges back to develop branch (if it exists)
+6. Deletes release branch (local and remote)
+7. All merge commits use message "Finish `<version>`"
 
 ## Prerequisites
 
