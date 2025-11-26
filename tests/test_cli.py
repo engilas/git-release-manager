@@ -688,8 +688,8 @@ class TestCLI:
         assert "✓ Switched to main branch" in result.output
 
     @patch("grm.cli.GitManager")
-    def test_finish_command_push_prompt_with_remote_accept(self, mock_git_manager):
-        """Test finish command push prompt when remote exists and user accepts."""
+    def test_finish_command_auto_push_with_remote(self, mock_git_manager):
+        """Test finish command automatically pushes when remote exists."""
         git_mock = Mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_current_branch_name.return_value = "release/1.2.0"
@@ -699,10 +699,9 @@ class TestCLI:
         mock_git_manager.return_value = git_mock
 
         runner = CliRunner()
-        result = runner.invoke(finish, input="y\ny\n")  # Yes to finish, Yes to push
+        result = runner.invoke(finish, input="y\n")  # Yes to finish
 
         assert result.exit_code == 0
-        assert "Push all changes to remote?" in result.output
         assert "Pushing changes to remote..." in result.output
         assert "✓ Pushed main" in result.output
         assert "✓ Pushed tag 1.2.0" in result.output
@@ -714,8 +713,8 @@ class TestCLI:
         git_mock.repo.git.push.assert_called_with("origin", "--tags")
 
     @patch("grm.cli.GitManager")
-    def test_finish_command_push_prompt_with_remote_decline(self, mock_git_manager):
-        """Test finish command push prompt when remote exists and user declines."""
+    def test_finish_command_auto_push_no_develop(self, mock_git_manager):
+        """Test finish command automatically pushes without develop branch."""
         git_mock = Mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_current_branch_name.return_value = "release/1.2.0"
@@ -725,15 +724,16 @@ class TestCLI:
         mock_git_manager.return_value = git_mock
 
         runner = CliRunner()
-        result = runner.invoke(finish, input="y\nn\n")  # Yes to finish, No to push
+        result = runner.invoke(finish, input="y\n")  # Yes to finish
 
         assert result.exit_code == 0
-        assert "Push all changes to remote?" in result.output
-        assert "Skipped pushing to remote" in result.output
+        assert "Pushing changes to remote..." in result.output
+        assert "✓ Pushed main" in result.output
+        assert "✓ Pushed tag 1.2.0" in result.output
 
-        # Verify no push operations occurred
-        git_mock.push_branch.assert_not_called()
-        git_mock.repo.git.push.assert_not_called()
+        # Verify push operations - develop should not be pushed
+        git_mock.push_branch.assert_called_once_with("main")
+        git_mock.repo.git.push.assert_called_with("origin", "--tags")
 
     @patch("grm.cli.GitManager")
     def test_finish_command_no_push_prompt_without_remote(self, mock_git_manager):
