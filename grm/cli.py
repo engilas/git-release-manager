@@ -208,32 +208,27 @@ def finish():
             info_message(f"  • Merged {integration_branch} back to develop")
         info_message("  • Deleted release branch")
 
-        # Push changes to remote if user confirms and remote exists
+        # Push changes to remote if remote exists
         has_remote = git_manager.has_remote()
         if has_remote:
-            if confirm_action("Push all changes to remote?", default=True):
-                info_message("Pushing changes to remote...")
-                try:
-                    # Push integration branch
-                    git_manager.push_branch(integration_branch)
-                    info_message(f"✓ Pushed {integration_branch}")
+            info_message("Pushing changes to remote...")
+            try:
+                # Push integration branch
+                git_manager.push_branch(integration_branch)
+                info_message(f"✓ Pushed {integration_branch}")
 
-                    # Push tag
-                    git_manager.repo.git.push("origin", "--tags")
-                    info_message(f"✓ Pushed tag {version}")
+                # Push tag
+                git_manager.repo.git.push("origin", "--tags")
+                info_message(f"✓ Pushed tag {version}")
 
-                    # Push develop if it exists
-                    if git_manager.branch_exists("develop"):
-                        git_manager.push_branch("develop")
-                        info_message("✓ Pushed develop")
+                # Push develop if it exists
+                if git_manager.branch_exists("develop"):
+                    git_manager.push_branch("develop")
+                    info_message("✓ Pushed develop")
 
-                except GitOperationError as e:
-                    warning_message(f"Failed to push some changes: {e}")
-                    warning_message("You may need to push manually")
-            else:
-                info_message(
-                    "Skipped pushing to remote. You can push manually when ready."
-                )
+            except GitOperationError as e:
+                warning_message(f"Failed to push some changes: {e}")
+                warning_message("You may need to push manually")
 
         # Switch to develop branch if it exists, otherwise stay on integration branch
         if git_manager.branch_exists("develop"):
