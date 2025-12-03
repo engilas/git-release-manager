@@ -363,6 +363,39 @@ class TestCLI:
     @patch("grm.cli.GitManager")
     @patch("grm.cli.ChangelogManager")
     @patch("grm.cli.VersionManager")
+    def test_release_command_version_mismatch(
+        self, mock_version_manager, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command fails when changelog version doesn't match latest tag."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "main"
+        git_mock.get_current_branch_name.return_value = "main"
+        git_mock.get_all_tags.return_value = ["2.0.0", "2.1.0", "2.2.0"]
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        changelog_mock.get_version_sections.return_value = [("3.0.0", "2025-11-26"), ("2.2.0", "2025-11-25")]
+        mock_changelog_manager.return_value = changelog_mock
+
+        version_mock = Mock()
+        version_mock.get_latest_version.return_value = Mock(__str__=lambda x: "2.2.0")
+        mock_version_manager.return_value = version_mock
+
+        runner = CliRunner()
+        result = runner.invoke(release, ["--minor"])
+
+        assert result.exit_code == 1
+        assert "Version mismatch" in result.output
+        assert "CHANGELOG.md has 3.0.0" in result.output
+        assert "latest git tag is 2.2.0" in result.output
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    @patch("grm.cli.VersionManager")
     @patch("grm.cli._prompt_for_bump_type")
     def test_release_command_prompt_for_bump_type(
         self,

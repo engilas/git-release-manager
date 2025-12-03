@@ -64,6 +64,20 @@ def release(bump_type: Optional[str]):
         tags = git_manager.get_all_tags()
         version_manager = VersionManager(tags)
 
+        # Check for mismatch between changelog and tags
+        try:
+            changelog_versions = changelog_manager.get_version_sections()
+            if changelog_versions and len(changelog_versions) > 0:
+                latest_changelog_version = changelog_versions[0][0]
+                latest_tag_version = version_manager.get_latest_version()
+                if latest_tag_version and str(latest_tag_version) != latest_changelog_version:
+                    error_exit(
+                        f"Version mismatch: CHANGELOG.md has {latest_changelog_version}, "
+                        f"but latest git tag is {latest_tag_version}"
+                    )
+        except (TypeError, IndexError):
+            pass
+
         # Determine version bump
         if bump_type is None:
             bump_type = _prompt_for_bump_type(version_manager)
