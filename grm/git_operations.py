@@ -100,6 +100,31 @@ class GitManager:
         
         return self.get_integration_branch()
 
+    def get_release_branch_names(self, fetch_remote: bool = False) -> List[str]:
+        """Get existing release branch names from local and origin refs."""
+        try:
+            release_branches = {
+                branch.name
+                for branch in self.repo.branches
+                if branch.name.startswith("release/")
+            }
+
+            if self.has_remote():
+                remote = self.repo.remote("origin")
+                if fetch_remote:
+                    remote.fetch()
+
+                remote_release_branches = {
+                    ref.name.removeprefix("origin/")
+                    for ref in remote.refs
+                    if ref.name.startswith("origin/release/")
+                }
+                release_branches.update(remote_release_branches)
+
+            return sorted(release_branches)
+        except Exception as e:
+            raise GitOperationError(f"Failed to inspect release branches: {e}")
+
     def get_all_tags(self) -> List[str]:
         """Get all tags from the repository.
 

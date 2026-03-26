@@ -315,6 +315,16 @@ def _validate_release_preconditions(
     if issues:
         error_exit("CHANGELOG.md format issues:\n  • " + "\n  • ".join(issues))
 
+    existing_release_branches = git_manager.get_release_branch_names(
+        fetch_remote=git_manager.has_remote()
+    )
+    if existing_release_branches:
+        error_exit(
+            "Existing release branch found: "
+            + ", ".join(existing_release_branches)
+            + ". Finish or delete it before creating a new release."
+        )
+
     # Check if there's content to release
     if not changelog_manager.has_unreleased_content():
         warning_message("No unreleased content found in CHANGELOG.md")

@@ -124,6 +124,26 @@ class TestGitManager:
         # Should return integration branch (main)
         assert git_manager.get_release_source_branch() == "main"
 
+    def test_get_release_branch_names_includes_local_and_remote(
+        self, git_manager: GitManager
+    ):
+        """Test release branch discovery includes local and remote branches."""
+        git_manager.create_branch("release/1.1.0", checkout=False)
+
+        remote_ref = Mock()
+        remote_ref.name = "origin/release/1.2.0"
+
+        with patch.object(git_manager, "has_remote", return_value=True):
+            with patch.object(git_manager.repo, "remote") as mock_remote:
+                mock_remote.return_value.refs = [remote_ref]
+
+                release_branches = git_manager.get_release_branch_names(
+                    fetch_remote=True
+                )
+
+        assert release_branches == ["release/1.1.0", "release/1.2.0"]
+        mock_remote.return_value.fetch.assert_called_once_with()
+
     def test_get_release_source_branch_develop_and_master(
         self, git_manager: GitManager
     ):

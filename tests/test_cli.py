@@ -14,6 +14,13 @@ from grm.changelog import ChangelogError
 class TestCLI:
     """Test cases for CLI commands."""
 
+    @staticmethod
+    def _create_git_mock() -> Mock:
+        """Create a GitManager mock with release checks disabled by default."""
+        git_mock = Mock()
+        git_mock.get_release_branch_names.return_value = []
+        return git_mock
+
     def test_cli_no_command(self):
         """Test CLI with no command shows help."""
         runner = CliRunner()
@@ -30,7 +37,7 @@ class TestCLI:
     ):
         """Test successful release command execution."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -68,7 +75,7 @@ class TestCLI:
     ):
         """Test release command with patch flag."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -98,7 +105,7 @@ class TestCLI:
         self, mock_version_manager, mock_changelog_manager, mock_git_manager
     ):
         """Test release command with major flag."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -127,7 +134,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command with dirty working directory."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = False
         mock_git_manager.return_value = git_mock
 
@@ -139,11 +146,43 @@ class TestCLI:
 
     @patch("grm.cli.GitManager")
     @patch("grm.cli.ChangelogManager")
+    def test_release_command_stops_when_release_branch_exists(
+        self, mock_changelog_manager, mock_git_manager
+    ):
+        """Test release command stops when a release branch already exists."""
+        git_mock = self._create_git_mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "main"
+        git_mock.get_current_branch_name.return_value = "main"
+        git_mock.has_remote.return_value = True
+        git_mock.get_release_branch_names.return_value = [
+            "release/1.1.0",
+            "release/1.2.0",
+        ]
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        runner = CliRunner()
+        result = runner.invoke(release, ["--minor"])
+
+        assert result.exit_code == 1
+        assert "Existing release branch found" in result.output
+        assert "release/1.1.0, release/1.2.0" in result.output
+        git_mock.get_release_branch_names.assert_called_once_with(fetch_remote=True)
+        git_mock.create_branch.assert_not_called()
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
     def test_release_command_wrong_branch(
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command on wrong branch."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "feature-branch"
@@ -163,7 +202,7 @@ class TestCLI:
     ):
         """Test successful release command from develop branch."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = (
             "develop"  # Should return develop when it exists
@@ -201,7 +240,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command on wrong branch when develop exists - prompt to switch."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "develop"
         git_mock.get_current_branch_name.return_value = "feature-branch"
@@ -223,7 +262,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command on wrong branch when develop exists - accept switch."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "develop"
         git_mock.get_current_branch_name.return_value = "feature-branch"
@@ -255,7 +294,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command on wrong branch - accept switch without remote."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "develop"
         git_mock.get_current_branch_name.return_value = "feature-branch"
@@ -285,7 +324,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command on wrong branch - accept switch but pull fails."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "develop"
         git_mock.get_current_branch_name.return_value = "feature-branch"
@@ -318,7 +357,7 @@ class TestCLI:
         self, mock_changelog_manager, mock_git_manager
     ):
         """Test release command with no changelog."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -341,7 +380,7 @@ class TestCLI:
         self, mock_version_manager, mock_changelog_manager, mock_git_manager
     ):
         """Test release command with no unreleased content."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -367,7 +406,7 @@ class TestCLI:
         self, mock_version_manager, mock_changelog_manager, mock_git_manager
     ):
         """Test release command fails when changelog version doesn't match latest tag."""
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -406,7 +445,7 @@ class TestCLI:
     ):
         """Test release command prompting for bump type."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -440,7 +479,7 @@ class TestCLI:
     ):
         """Test release command pushes branch when remote exists."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -475,7 +514,7 @@ class TestCLI:
     ):
         """Test release command skips push when no remote exists."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
@@ -510,7 +549,7 @@ class TestCLI:
     ):
         """Test release command handles push failures gracefully."""
         # Setup mocks
-        git_mock = Mock()
+        git_mock = self._create_git_mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
