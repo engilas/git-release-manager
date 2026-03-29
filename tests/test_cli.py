@@ -6,7 +6,7 @@ from unittest.mock import patch, Mock
 import pytest
 from click.testing import CliRunner
 
-from grm.cli import cli, release, finish
+from grm.cli import cli, release, hotfix, finish
 from grm.git_operations import GitOperationError
 from grm.changelog import ChangelogError
 
@@ -19,6 +19,7 @@ class TestCLI:
         """Create a GitManager mock with release checks disabled by default."""
         git_mock = Mock()
         git_mock.get_release_branch_names.return_value = []
+        git_mock.get_version_branch_names.return_value = []
         return git_mock
 
     def test_cli_no_command(self):
@@ -155,7 +156,7 @@ class TestCLI:
         git_mock.get_release_source_branch.return_value = "main"
         git_mock.get_current_branch_name.return_value = "main"
         git_mock.has_remote.return_value = True
-        git_mock.get_release_branch_names.return_value = [
+        git_mock.get_version_branch_names.return_value = [
             "release/1.1.0",
             "release/1.2.0",
         ]
@@ -173,7 +174,9 @@ class TestCLI:
         assert result.exit_code == 1
         assert "Existing release branch found" in result.output
         assert "release/1.1.0, release/1.2.0" in result.output
-        git_mock.get_release_branch_names.assert_called_once_with(fetch_remote=True)
+        git_mock.get_version_branch_names.assert_called_once_with(
+            "release", fetch_remote=True
+        )
         git_mock.create_branch.assert_not_called()
 
     @patch("grm.cli.GitManager")
@@ -579,6 +582,77 @@ class TestCLI:
         git_mock.push_branch.assert_called_once_with("release/1.1.0", set_upstream=True)
 
     @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    @patch("grm.cli.VersionManager")
+    def test_hotfix_command_success(
+        self, mock_version_manager, mock_changelog_manager, mock_git_manager
+    ):
+        """Test successful hotfix command execution."""
+        git_mock = self._create_git_mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "develop"
+        git_mock.get_current_branch_name.return_value = "develop"
+        git_mock.get_all_tags.return_value = ["1.1.0"]
+        git_mock.has_remote.return_value = True
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        version_mock = Mock()
+        version_mock.suggest_version.return_value = Mock(__str__=lambda x: "1.2.0")
+        mock_version_manager.return_value = version_mock
+
+        runner = CliRunner()
+        result = runner.invoke(hotfix, ["--minor"], input="y\n")
+
+        assert result.exit_code == 0
+        assert "Hotfix branch 'hotfix/1.2.0' created successfully" in result.output
+        git_mock.create_branch.assert_called_once_with("hotfix/1.2.0", checkout=True)
+        changelog_mock.move_unreleased_to_version.assert_called_once_with("1.2.0")
+        git_mock.commit_changes.assert_called_once_with(
+            "Changelog", files=["CHANGELOG.md"]
+        )
+        git_mock.push_branch.assert_called_once_with("hotfix/1.2.0", set_upstream=True)
+
+    @patch("grm.cli.GitManager")
+    @patch("grm.cli.ChangelogManager")
+    def test_hotfix_command_stops_when_hotfix_branch_exists(
+        self, mock_changelog_manager, mock_git_manager
+    ):
+        """Test hotfix command stops when a hotfix branch already exists."""
+        git_mock = self._create_git_mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_release_source_branch.return_value = "develop"
+        git_mock.get_current_branch_name.return_value = "develop"
+        git_mock.has_remote.return_value = True
+        git_mock.get_version_branch_names.return_value = [
+            "hotfix/1.1.1",
+            "hotfix/1.1.2",
+        ]
+        mock_git_manager.return_value = git_mock
+
+        changelog_mock = Mock()
+        changelog_mock.changelog_exists.return_value = True
+        changelog_mock.validate_changelog_format.return_value = []
+        changelog_mock.has_unreleased_content.return_value = True
+        mock_changelog_manager.return_value = changelog_mock
+
+        runner = CliRunner()
+        result = runner.invoke(hotfix, ["--patch"])
+
+        assert result.exit_code == 1
+        assert "Existing hotfix branch found" in result.output
+        assert "hotfix/1.1.1, hotfix/1.1.2" in result.output
+        git_mock.get_version_branch_names.assert_called_once_with(
+            "hotfix", fetch_remote=True
+        )
+        git_mock.create_branch.assert_not_called()
+
+    @patch("grm.cli.GitManager")
     def test_finish_command_success(self, mock_git_manager):
         """Test successful finish command execution."""
         git_mock = Mock()
@@ -602,8 +676,31 @@ class TestCLI:
         git_mock.delete_branch.assert_called_once()
 
     @patch("grm.cli.GitManager")
+    def test_finish_command_hotfix_branch_success(self, mock_git_manager):
+        """Test successful finish command execution for a hotfix branch."""
+        git_mock = Mock()
+        git_mock.is_working_directory_clean.return_value = True
+        git_mock.get_current_branch_name.return_value = "hotfix/1.2.0"
+        git_mock.get_integration_branch.return_value = "main"
+        git_mock.branch_exists.return_value = True
+        git_mock.has_remote.return_value = False
+        mock_git_manager.return_value = git_mock
+
+        runner = CliRunner()
+        result = runner.invoke(finish, input="y\n")
+
+        assert result.exit_code == 0
+        assert "Hotfix 1.2.0 finished successfully" in result.output
+        git_mock.checkout_branch.assert_any_call("main")
+        git_mock.merge_branch.assert_any_call("hotfix/1.2.0", "Finish 1.2.0", no_ff=True)
+        git_mock.create_tag.assert_called_once_with("1.2.0")
+        git_mock.delete_branch.assert_called_once_with(
+            "hotfix/1.2.0", force=False, delete_remote=False
+        )
+
+    @patch("grm.cli.GitManager")
     def test_finish_command_not_release_branch(self, mock_git_manager):
-        """Test finish command not on release branch."""
+        """Test finish command not on a managed branch."""
         git_mock = Mock()
         git_mock.is_working_directory_clean.return_value = True
         git_mock.get_current_branch_name.return_value = "main"
@@ -613,7 +710,7 @@ class TestCLI:
         result = runner.invoke(finish)
 
         assert result.exit_code == 1
-        assert "release branch" in result.output
+        assert "release or hotfix branch" in result.output
 
     @patch("grm.cli.GitManager")
     def test_finish_command_dirty_working_directory(self, mock_git_manager):

@@ -144,6 +144,26 @@ class TestGitManager:
         assert release_branches == ["release/1.1.0", "release/1.2.0"]
         mock_remote.return_value.fetch.assert_called_once_with()
 
+    def test_get_version_branch_names_filters_hotfix_branches(
+        self, git_manager: GitManager
+    ):
+        """Test version branch discovery filters hotfix branches."""
+        git_manager.create_branch("hotfix/1.1.1", checkout=False)
+
+        remote_ref = Mock()
+        remote_ref.name = "origin/hotfix/1.1.2"
+
+        with patch.object(git_manager, "has_remote", return_value=True):
+            with patch.object(git_manager.repo, "remote") as mock_remote:
+                mock_remote.return_value.refs = [remote_ref]
+
+                hotfix_branches = git_manager.get_version_branch_names(
+                    "hotfix", fetch_remote=True
+                )
+
+        assert hotfix_branches == ["hotfix/1.1.1", "hotfix/1.1.2"]
+        mock_remote.return_value.fetch.assert_called_once_with()
+
     def test_get_release_source_branch_develop_and_master(
         self, git_manager: GitManager
     ):

@@ -102,11 +102,18 @@ class GitManager:
 
     def get_release_branch_names(self, fetch_remote: bool = False) -> List[str]:
         """Get existing release branch names from local and origin refs."""
+        return self.get_version_branch_names("release", fetch_remote=fetch_remote)
+
+    def get_version_branch_names(
+        self, branch_type: str, fetch_remote: bool = False
+    ) -> List[str]:
+        """Get existing version branch names from local and origin refs."""
         try:
-            release_branches = {
+            branch_prefix = f"{branch_type}/"
+            version_branches = {
                 branch.name
                 for branch in self.repo.branches
-                if branch.name.startswith("release/")
+                if branch.name.startswith(branch_prefix)
             }
 
             if self.has_remote():
@@ -114,16 +121,16 @@ class GitManager:
                 if fetch_remote:
                     remote.fetch()
 
-                remote_release_branches = {
-                    ref.name.removeprefix("origin/")
+                remote_version_branches = {
+                    ref.name[len("origin/") :]
                     for ref in remote.refs
-                    if ref.name.startswith("origin/release/")
+                    if ref.name.startswith(f"origin/{branch_prefix}")
                 }
-                release_branches.update(remote_release_branches)
+                version_branches.update(remote_version_branches)
 
-            return sorted(release_branches)
+            return sorted(version_branches)
         except Exception as e:
-            raise GitOperationError(f"Failed to inspect release branches: {e}")
+            raise GitOperationError(f"Failed to inspect {branch_type} branches: {e}")
 
     def get_all_tags(self) -> List[str]:
         """Get all tags from the repository.
