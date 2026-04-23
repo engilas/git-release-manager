@@ -35,12 +35,12 @@ def warning_message(message: str) -> None:
 
 
 def info_message(message: str) -> None:
-    """Print info message in blue.
+    """Print info message in bright blue (readable on dark terminals).
 
     Args:
         message: Info message to display
     """
-    click.echo(click.style(message, fg="blue"))
+    click.echo(click.style(message, fg="bright_blue"))
 
 
 def confirm_action(message: str, default: bool = False) -> bool:
